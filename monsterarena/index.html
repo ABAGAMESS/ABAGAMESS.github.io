@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Monster Arena - V66 Pro Rematch</title>
+    <style>
+        body { margin: 0; overflow: hidden; font-family: 'Segoe UI', sans-serif; background: #000; }
+        #menu, #endScreen, #teamSelection, #pauseMenu, #settingsMenu {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            display: flex; align-items: center; justify-content: center;
+            background: radial-gradient(circle, #0f172a 0%, #020617 100%); z-index: 100; color: white;
+        }
+        #endScreen, #teamSelection, #pauseMenu, #settingsMenu { display: none; flex-direction: column; }
+        #endScreen, #pauseMenu, #settingsMenu { background: rgba(0,0,0,0.95); z-index: 110; }
+        
+        .ui-box {
+            text-align: center; background: rgba(15, 23, 42, 0.95); padding: 40px;
+            border-radius: 40px; border: 4px solid #34d399;
+            box-shadow: 0 0 60px rgba(52, 211, 153, 0.3);
+            min-width: 450px;
+        }
+        h1 { font-size: 42px; margin: 0 0 20px 0; color: #34d399; letter-spacing: 5px; text-transform: uppercase; }
+        
+        /* Bitiş Ekranı Özel Tasarımı */
+        #finalScoreDisplay { font-size: 80px; color: #ffeb3b; margin: 0; font-weight: 900; text-shadow: 0 0 30px rgba(255,235,59,0.5); }
+        #winnerText { font-size: 32px; color: #fff; margin: 10px 0 30px 0; letter-spacing: 2px; }
+
+        .btn {
+            background: #34d399; color: #000; padding: 15px 30px;
+            font-size: 18px; font-weight: bold; border: none; border-radius: 12px;
+            cursor: pointer; transition: 0.3s; margin: 8px; width: 280px;
+            text-transform: uppercase;
+        }
+        .btn:hover { transform: scale(1.05); background: #fff; box-shadow: 0 0 20px #34d399; }
+        .btn.secondary { background: #475569; color: white; }
+
+        .setting-row { margin: 25px 0; display: flex; align-items: center; justify-content: space-between; padding: 0 20px; }
+        .selector { display: flex; align-items: center; gap: 15px; font-size: 20px; }
+        .arrow { cursor: pointer; font-size: 30px; color: #34d399; user-select: none; }
+        .vol-slider { width: 150px; cursor: pointer; accent-color: #34d399; }
+
+        #settingsBtn {
+            position: absolute; top: 30px; right: 30px; font-size: 40px;
+            cursor: pointer; color: #34d399; transition: 0.3s; z-index: 105;
+        }
+        #settingsBtn:hover { transform: rotate(90deg) scale(1.1); }
+
+        #pauseBtn {
+            position: absolute; top: 20px; left: 20px; width: 60px; height: 60px;
+            background: rgba(0,0,0,0.8); border: 2px solid #34d399; border-radius: 15px;
+            color: #34d399; font-size: 24px; cursor: pointer;
+            display: none; z-index: 200; align-items: center; justify-content: center;
+        }
+
+        #hud {
+            position: absolute; top: 20px; width: 100%;
+            display: none; justify-content: center; z-index: 10; pointer-events: none;
+            flex-direction: column; align-items: center;
+        }
+        .score-container {
+            background: rgba(0,0,0,0.85); padding: 10px 40px;
+            border-radius: 20px; border: 2px solid #34d399;
+            font-size: 28px; font-weight: 900; color: white; display: flex; gap: 20px;
+        }
+        #timer { font-size: 24px; color: #ffeb3b; margin-top: 10px; font-weight: bold; }
+
+        .stamina-container {
+            position: absolute; bottom: 30px; width: 220px; height: 15px;
+            background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.3);
+            border-radius: 10px; overflow: hidden; display: none; z-index: 20;
+        }
+        #stamina-p1 { left: 5%; }
+        #stamina-p2 { right: 5%; }
+        .stamina-fill { height: 100%; width: 100%; transition: width 0.05s linear; }
+        #fill-p1 { background: #3b82f6; box-shadow: 0 0 10px #3b82f6; }
+        #fill-p2 { background: #ef4444; box-shadow: 0 0 10px #ef4444; }
+    </style>
+</head>
+<body onclick="tryAutoPlay()">
+
+<audio id="bgMusic" loop preload="auto">
+    <source src="https://assets.mixkit.co/music/preview/mixkit-motivating-rock-beat-instrumental-223.mp3" type="audio/mpeg">
+</audio>
+
+<div id="menu">
+    <div id="settingsBtn" onclick="toggleSettings(true)">⚙️</div>
+    <div class="ui-box">
+        <h1 id="txt-title">MONSTER ARENA</h1>
+        <button class="btn" id="txt-solo" onclick="startGame(true)">TEK KİŞİ (VS BOT)</button><br>
+        <button class="btn" id="txt-pvp" onclick="openTeamSelection()">2 KİŞİLİK (PVP)</button>
+    </div>
+</div>
+
+<div id="settingsMenu">
+    <div class="ui-box">
+        <h1 id="txt-settings">AYARLAR</h1>
+        <div class="setting-row">
+            <span id="txt-lang-label">DİL:</span>
+            <div class="selector">
+                <span class="arrow" onclick="changeLang(-1)">◀</span>
+                <span id="currentLangDisplay" style="min-width: 100px;">TÜRKÇE</span>
+                <span class="arrow" onclick="changeLang(1)">▶</span>
+            </div>
+        </div>
+        <div class="setting-row">
+            <span id="txt-music-label">MÜZİK SESİ:</span>
+            <input type="range" class="vol-slider" min="0" max="1" step="0.05" value="0.5" id="volumeSlider" oninput="updateVolume(this.value)">
+        </div>
+        <button class="btn" id="txt-back" onclick="toggleSettings(false)">GERİ</button>
+    </div>
+</div>
+
+<div id="teamSelection">
+    <div class="ui-box">
+        <h1 id="txt-names">TAKIM İSİMLERİ</h1>
+        <input type="text" id="p1NameInput" value="Mavi Takım" style="width:80%; padding:12px; margin:10px; border-radius:10px; text-align:center;">
+        <input type="text" id="p2NameInput" value="Kırmızı Takım" style="width:80%; padding:12px; margin:10px; border-radius:10px; text-align:center;">
+        <button class="btn" id="txt-start" onclick="startGame(false)">BAŞLA</button>
+    </div>
+</div>
+
+<button id="pauseBtn" onclick="togglePause()">II</button>
+
+<div id="pauseMenu">
+    <div class="ui-box">
+        <h1 id="txt-paused">DURAKLATILDI</h1>
+        <button class="btn" id="txt-resume" onclick="togglePause()">DEVAM ET</button><br>
+        <button class="btn secondary" id="txt-reset" onclick="resetMatch()">YENİDEN BAŞLAT</button><br>
+        <button class="btn secondary" id="txt-home" onclick="location.reload()">ANA MENÜ</button>
+    </div>
+</div>
+
+<div id="hud">
+    <div class="score-container">
+        <span id="p1Label" style="color:#3b82f6;">P1</span>: <span id="pScore">0</span>
+        <span style="color:#34d399;">-</span>
+        <span id="p2Label" style="color:#ef4444;">P2</span>: <span id="aiScore">0</span>
+    </div>
+    <div id="timer">01:00</div>
+</div>
+
+<div id="stamina-p1" class="stamina-container"><div id="fill-p1" class="stamina-fill"></div></div>
+<div id="stamina-p2" class="stamina-container"><div id="fill-p2" class="stamina-fill"></div></div>
+
+<div id="endScreen">
+    <div class="ui-box">
+        <div id="finalScoreDisplay">0 - 0</div>
+        <div id="winnerText">... KAZANDI!</div>
+        <button class="btn" id="txt-rematch" onclick="resetMatch();">RÖVANŞ</button><br>
+        <button class="btn secondary" id="txt-home2" onclick="location.reload()">ANA MENÜ</button>
+    </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+<script>
+    const langs = [
+        { id: 'tr', name: 'TÜRKÇE', title: 'MONSTER ARENA', solo: 'TEK KİŞİ (VS BOT)', pvp: '2 KİŞİLİK (PVP)', settings: 'AYARLAR', lang: 'DİL:', music: 'MÜZİK SESİ:', back: 'GERİ', start: 'BAŞLA', names: 'TAKIM İSİMLERİ', paused: 'DURAKLATILDI', resume: 'DEVAM ET', reset: 'YENİDEN BAŞLAT', home: 'ANA MENÜ', win: ' KAZANDI!', rematch: 'RÖVANŞ' },
+        { id: 'en', name: 'ENGLISH', title: 'MONSTER STADIUM', solo: 'SOLO (VS BOT)', pvp: 'VERSUS (PVP)', settings: 'SETTINGS', lang: 'LANGUAGE:', music: 'MUSIC VOL:', back: 'BACK', start: 'START', names: 'TEAM NAMES', paused: 'PAUSED', resume: 'RESUME', reset: 'RESTART', home: 'MAIN MENU', win: ' WINS!', rematch: 'REMATCH' }
+    ];
+    let currentLangIdx = 0;
+
+    const bgMusic = document.getElementById('bgMusic');
+    bgMusic.volume = 0.5;
+
+    function tryAutoPlay() {
+        if(bgMusic.paused && gameRunning && !gamePaused) {
+            bgMusic.play().catch(() => {});
+        }
+    }
+
+    function updateVolume(val) { bgMusic.volume = val; }
+
+    function changeLang(dir) { currentLangIdx = (currentLangIdx + dir + langs.length) % langs.length; updateLangUI(); }
+    function updateLangUI() {
+        const l = langs[currentLangIdx];
+        document.getElementById('currentLangDisplay').innerText = l.name;
+        document.getElementById('txt-title').innerText = l.title;
+        document.getElementById('txt-solo').innerText = l.solo;
+        document.getElementById('txt-pvp').innerText = l.pvp;
+        document.getElementById('txt-settings').innerText = l.settings;
+        document.getElementById('txt-lang-label').innerText = l.lang;
+        document.getElementById('txt-music-label').innerText = l.music;
+        document.getElementById('txt-back').innerText = l.back;
+        document.getElementById('txt-start').innerText = l.start;
+        document.getElementById('txt-names').innerText = l.names;
+        document.getElementById('txt-paused').innerText = l.paused;
+        document.getElementById('txt-resume').innerText = l.resume;
+        document.getElementById('txt-reset').innerText = l.reset;
+        document.getElementById('txt-home').innerText = l.home;
+        document.getElementById('txt-home2').innerText = l.home;
+        document.getElementById('txt-rematch').innerText = l.rematch;
+    }
+
+    let scene, renderer, ball, p1, p2, cam1, cam2;
+    let keys = {};
+    let score = { p1: 0, p2: 0 };
+    let gameRunning = false, gamePaused = false, isBotMode = true;
+    let timeLeft = 60, timerInterval;
+
+    let stp1 = 100, stp2 = 100;
+    let p1LastNitroTime = 0, p2LastNitroTime = 0;
+    let p1LastTap = 0, p2LastTap = 0;
+    let p1Nitro = false, p2Nitro = false;
+    let p1CurrentSpeed = 0, p2CurrentSpeed = 0;
+
+    const FIELD_W = 160, FIELD_H = 320;
+    const SPEED = 0.45;           
+    const NITRO_SPEED = 0.80;     
+    const ROT_SPEED = 0.035;      
+    const BOUND_X = 76, BOUND_Z = 156;
+
+    function init() {
+        scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x020205);
+        renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.autoClear = false;
+        document.body.appendChild(renderer.domElement);
+
+        cam1 = new THREE.PerspectiveCamera(72, window.innerWidth/window.innerHeight, 0.1, 2000);
+        cam2 = new THREE.PerspectiveCamera(72, window.innerWidth/window.innerHeight, 0.1, 2000);
+        
+        scene.add(new THREE.AmbientLight(0xffffff, 0.7));
+        const dl = new THREE.DirectionalLight(0xffffff, 0.8); dl.position.set(50, 100, 50); scene.add(dl);
+
+        createStadiumArena();
+        createTeamCornerFlags(); 
+        ball = createSoccerBall(); scene.add(ball);
+        p1 = createTruck(0x3b82f6); p2 = createTruck(0xef4444);
+        resetPositions();
+
+        window.addEventListener('keydown', e => {
+            const now = Date.now();
+            if(e.code === 'KeyW' && !keys['KeyW']) { if(now - p1LastTap < 250) p1Nitro = true; p1LastTap = now; }
+            if(e.code === 'ArrowUp' && !keys['ArrowUp'] && !isBotMode) { if(now - p2LastTap < 250) p2Nitro = true; p2LastTap = now; }
+            keys[e.code] = true;
+        });
+        window.addEventListener('keyup', e => {
+            if(e.code === 'KeyW') p1Nitro = false;
+            if(e.code === 'ArrowUp') p2Nitro = false;
+            keys[e.code] = false;
+        });
+        window.addEventListener('resize', onResize);
+        updateLangUI();
+    }
+
+    function createStadiumArena() {
+        const arenaGeo = new THREE.PlaneGeometry(FIELD_W + 100, FIELD_H + 100);
+        const arenaMat = new THREE.MeshPhongMaterial({ color: 0x1a472a });
+        const arena = new THREE.Mesh(arenaGeo, arenaMat);
+        arena.rotation.x = -Math.PI/2; scene.add(arena);
+        
+        const canvas = document.createElement('canvas'); 
+        canvas.width = 1024; canvas.height = 2048;
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = "#1a472a"; ctx.fillRect(0,0,1024,2048);
+        ctx.strokeStyle = "rgba(255, 255, 255, 0.8)"; ctx.lineWidth = 12; 
+        ctx.strokeRect(50, 50, 924, 1948);
+        ctx.beginPath(); ctx.moveTo(50, 1024); ctx.lineTo(974, 1024); ctx.stroke();
+        ctx.beginPath(); ctx.arc(512, 1024, 150, 0, Math.PI * 2); ctx.stroke();
+        ctx.fillStyle = "white"; ctx.beginPath(); ctx.arc(512, 1024, 10, 0, Math.PI * 2); ctx.fill();
+
+        [50, 1998].forEach(yBase => {
+            const dir = yBase === 50 ? 1 : -1;
+            ctx.strokeRect(262, yBase, 500, 300 * dir);
+            ctx.strokeRect(387, yBase, 250, 120 * dir);
+            ctx.beginPath(); ctx.arc(512, yBase + 220 * dir, 8, 0, Math.PI * 2); ctx.fill();
+        });
+
+        const lineTex = new THREE.CanvasTexture(canvas);
+        const lines = new THREE.Mesh(new THREE.PlaneGeometry(FIELD_W, FIELD_H), new THREE.MeshBasicMaterial({ map: lineTex, transparent: true }));
+        lines.rotation.x = -Math.PI/2; lines.position.y = 0.2; scene.add(lines);
+
+        createGoal(0, -FIELD_H/2, 0); createGoal(0, FIELD_H/2, Math.PI);
+    }
+
+    function createTeamCornerFlags() {
+        const flagConfigs = [
+            { pos: [FIELD_W/2, -FIELD_H/2], color: 0x3b82f6 }, 
+            { pos: [-FIELD_W/2, -FIELD_H/2], color: 0x3b82f6 },
+            { pos: [FIELD_W/2, FIELD_H/2], color: 0xef4444 },  
+            { pos: [-FIELD_W/2, FIELD_H/2], color: 0xef4444 }  
+        ];
+        flagConfigs.forEach(cfg => {
+            const group = new THREE.Group();
+            const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 12), new THREE.MeshPhongMaterial({color: 0xeeeeee}));
+            pole.position.y = 6;
+            group.add(pole);
+            const flag = new THREE.Mesh(new THREE.BoxGeometry(5, 3.5, 0.1), new THREE.MeshPhongMaterial({color: cfg.color}));
+            flag.position.set(2.5, 10, 0);
+            group.add(flag);
+            group.position.set(cfg.pos[0], 0.1, cfg.pos[1]);
+            scene.add(group);
+        });
+    }
+
+    function createGoal(x, z, rot) {
+        const g = new THREE.Group(); const m = new THREE.MeshPhongMaterial({ color: 0xffffff });
+        const p1Mesh = new THREE.Mesh(new THREE.CylinderGeometry(0.8,0.8,20), m); p1Mesh.position.set(-22,10,0); g.add(p1Mesh);
+        const p2Mesh = new THREE.Mesh(new THREE.CylinderGeometry(0.8,0.8,20), m); p2Mesh.position.set(22,10,0); g.add(p2Mesh);
+        const top = new THREE.Mesh(new THREE.CylinderGeometry(1,1,44), m); top.rotation.z = Math.PI/2; top.position.y = 20; g.add(top);
+        g.position.set(x,0,z); g.rotation.y = rot; scene.add(g);
+        if(!scene.goals) scene.goals = []; scene.goals.push(g);
+    }
+
+    function createSoccerBall() {
+        const b = new THREE.Mesh(new THREE.SphereGeometry(3.8, 24, 24), new THREE.MeshPhongMaterial({ color: 0xffffff }));
+        b.velocity = new THREE.Vector3(); return b;
+    }
+
+    function createTruck(color) {
+        const t = new THREE.Group(); t.wheels = [];
+        const body = new THREE.Mesh(new THREE.BoxGeometry(8, 4, 12), new THREE.MeshPhongMaterial({color: color})); body.position.y = 5; t.add(body);
+        [[-4.5, 3.5, 4], [4.5, 3.5, 4], [-4.5, 3.5, -4], [4.5, 3.5, -4]].forEach(pos => {
+            const w = new THREE.Mesh(new THREE.CylinderGeometry(3.5,3.5,2.5,12), new THREE.MeshPhongMaterial({color:0x111}));
+            w.rotation.z = Math.PI/2; w.position.set(...pos); t.add(w); t.wheels.push(w);
+        });
+        scene.add(t); return t;
+    }
+
+    function updatePhysics() {
+        if(!gameRunning || gamePaused) return;
+        let now = Date.now();
+
+        if (p1Nitro && stp1 > 0 && keys['KeyW']) { stp1 -= 0.65; p1LastNitroTime = now; }
+        else if (now - p1LastNitroTime > 1000) { stp1 = Math.min(100, stp1 + 0.18); }
+
+        if (p2Nitro && stp2 > 0) { stp2 -= 0.65; p2LastNitroTime = now; }
+        else if (now - p2LastNitroTime > 1000) { stp2 = Math.min(100, stp2 + 0.18); }
+
+        document.getElementById('fill-p1').style.width = stp1 + "%";
+        document.getElementById('fill-p2').style.width = stp2 + "%";
+
+        p1.position.y = 0; p2.position.y = 0; 
+
+        if(ball.position.y > 3.8 || ball.velocity.y > 0) ball.velocity.y -= 0.035;
+        ball.position.add(ball.velocity);
+        ball.velocity.multiplyScalar(0.985); 
+        if(ball.position.y < 3.8) { ball.position.y = 3.8; ball.velocity.y *= -0.4; }
+
+        scene.goals.forEach(goal => {
+            let relPos = ball.position.clone().sub(goal.position);
+            if(Math.abs(relPos.z) < 5 && Math.abs(relPos.x) < 22 && ball.position.y > 18 && ball.position.y < 23) {
+                ball.velocity.z *= -1.2; ball.velocity.y += 0.05;
+            }
+        });
+
+        let carDist = p1.position.distanceTo(p2.position);
+        if(carDist < 12) {
+            let bounceDir = new THREE.Vector3().subVectors(p1.position, p2.position).normalize();
+            p1.position.addScaledVector(bounceDir, 1.2);
+            p2.position.addScaledVector(bounceDir, -1.2);
+        }
+
+        if(Math.abs(ball.position.x) > FIELD_W/2-4) { ball.velocity.x *= -0.7; ball.position.x = Math.sign(ball.position.x)*(FIELD_W/2-4); }
+        if(Math.abs(ball.position.z) > FIELD_H/2-4) {
+            if(Math.abs(ball.position.x) < 22 && ball.position.y < 20) {
+                if(ball.position.z > 0) score.p1++; else score.p2++;
+                document.getElementById('pScore').innerText = score.p1;
+                document.getElementById('aiScore').innerText = score.p2;
+                resetPositions();
+            } else { ball.velocity.z *= -0.7; ball.position.z = Math.sign(ball.position.z)*(FIELD_H/2-4); }
+        }
+
+        [ {car: p1, speed: p1CurrentSpeed}, {car: p2, speed: p2CurrentSpeed} ].forEach(obj => {
+            let dist = obj.car.position.distanceTo(ball.position);
+            if(dist < 10.5) {
+                let hitDir = new THREE.Vector3().subVectors(ball.position, obj.car.position).normalize();
+                let currentBallVel = ball.velocity.length();
+                let hitPower = (Math.abs(obj.speed) * 1.3) + 0.12;
+                if(currentBallVel > 2.5) hitPower *= 0.5;
+                ball.velocity.add(hitDir.multiplyScalar(hitPower));
+                if(ball.velocity.length() > 3.2) ball.velocity.setLength(3.2);
+            }
+        });
+
+        [p1, p2].forEach(car => { car.position.x = Math.max(-BOUND_X, Math.min(BOUND_X, car.position.x)); car.position.z = Math.max(-BOUND_Z, Math.min(BOUND_Z, car.position.z)); });
+    }
+
+    function handleInput() {
+        if(!gameRunning || gamePaused) return;
+        
+        p1CurrentSpeed = 0;
+        let s1 = (p1Nitro && stp1 > 2) ? NITRO_SPEED : SPEED;
+        if(keys['KeyW']) { p1.translateZ(s1); p1.wheels.forEach(w=>w.rotation.x+=0.2); p1CurrentSpeed = s1; }
+        if(keys['KeyS']) { p1.translateZ(-SPEED*0.5); p1CurrentSpeed = -SPEED*0.5; }
+        if(keys['KeyA']) p1.rotation.y += ROT_SPEED;
+        if(keys['KeyD']) p1.rotation.y -= ROT_SPEED;
+
+        p2CurrentSpeed = 0;
+        if(!isBotMode) {
+            let s2 = (p2Nitro && stp2 > 2) ? NITRO_SPEED : SPEED;
+            if(keys['ArrowUp']) { p2.translateZ(s2); p2.wheels.forEach(w=>w.rotation.x+=0.2); p2CurrentSpeed = s2; }
+            if(keys['ArrowDown']) { p2.translateZ(-SPEED*0.5); p2CurrentSpeed = -SPEED*0.5; }
+            if(keys['ArrowLeft']) p2.rotation.y += ROT_SPEED;
+            if(keys['ArrowRight']) p2.rotation.y -= ROT_SPEED;
+        } else {
+            let ballPos = ball.position.clone();
+            let p2Pos = p2.position.clone();
+            let targetGoalPos = new THREE.Vector3(0, 0, -160); 
+            let driveTarget = ballPos.clone().add(ballPos.clone().sub(targetGoalPos).normalize().multiplyScalar(12));
+            let distToBall = p2Pos.distanceTo(ballPos);
+            let target;
+            if (p2Pos.z > ballPos.z && Math.abs(p2Pos.x - ballPos.x) < 15) { target = ballPos; } else { target = driveTarget; }
+
+            let targetRot = Math.atan2(target.x - p2Pos.x, target.z - p2Pos.z);
+            let diff = targetRot - p2.rotation.y;
+            while(diff < -Math.PI) diff += Math.PI*2;
+            while(diff > Math.PI) diff -= Math.PI*2;
+            p2.rotation.y += diff * 0.06;
+
+            p2Nitro = (distToBall > 50 && stp2 > 30);
+            let aiSpeed = (p2Nitro && stp2 > 2) ? NITRO_SPEED : SPEED;
+            p2.translateZ(aiSpeed);
+            p2CurrentSpeed = aiSpeed;
+            p2.wheels.forEach(w => w.rotation.x += 0.2);
+        }
+    }
+
+    function startGame(bot) {
+        isBotMode = bot;
+        document.getElementById('menu').style.display = 'none';
+        document.getElementById('teamSelection').style.display = 'none';
+        document.getElementById('hud').style.display = 'flex';
+        document.getElementById('pauseBtn').style.display = 'flex';
+        document.getElementById('stamina-p1').style.display = 'block';
+        document.getElementById('stamina-p2').style.display = isBotMode ? 'none' : 'block'; 
+        document.getElementById('p1Label').innerText = document.getElementById('p1NameInput').value;
+        document.getElementById('p2Label').innerText = isBotMode ? "BOT" : document.getElementById('p2NameInput').value;
+        onResize();
+        gameRunning = true; 
+        gamePaused = false;
+        bgMusic.play().catch(() => {});
+        animate(); startTimer();
+    }
+
+    function resetPositions() {
+        ball.velocity.set(0,0,0); ball.position.set(0,15,0);
+        p1.position.set(0,0,-125); p1.rotation.set(0,0,0);
+        p2.position.set(0,0,125); p2.rotation.set(0,Math.PI,0);
+        p1Nitro = p2Nitro = false;
+        p1CurrentSpeed = p2CurrentSpeed = 0;
+        stp1 = 100; stp2 = 100;
+        p1LastNitroTime = p2LastNitroTime = 0;
+    }
+
+    function resetMatch() {
+        score = { p1: 0, p2: 0 };
+        document.getElementById('pScore').innerText = "0";
+        document.getElementById('aiScore').innerText = "0";
+        timeLeft = 60; 
+        document.getElementById('timer').innerText = "01:00";
+        resetPositions(); 
+        document.getElementById('endScreen').style.display = 'none';
+        gamePaused = false;
+        gameRunning = true; 
+        bgMusic.play().catch(() => {});
+        startTimer();
+        animate(); // Animasyon döngüsünü tekrar başlat
+    }
+
+    function startTimer() {
+        clearInterval(timerInterval);
+        timerInterval = setInterval(() => {
+            if(gamePaused || !gameRunning) return; 
+            timeLeft--;
+            document.getElementById('timer').innerText = `00:${timeLeft.toString().padStart(2,'0')}`;
+            if(timeLeft<=0) endGame();
+        }, 1000);
+    }
+
+    function endGame() {
+        gameRunning = false; 
+        bgMusic.pause();
+        const p1Name = document.getElementById('p1NameInput').value;
+        const p2Name = isBotMode ? "BOT" : document.getElementById('p2NameInput').value;
+        
+        // Skor Ekranı Güncelleme
+        document.getElementById('finalScoreDisplay').innerText = `${score.p1} - ${score.p2}`;
+        
+        let winnerText = "BERABERE / DRAW";
+        if(score.p1 > score.p2) winnerText = p1Name + langs[currentLangIdx].win;
+        else if(score.p2 > score.p1) winnerText = p2Name + langs[currentLangIdx].win;
+        
+        document.getElementById('winnerText').innerText = winnerText;
+        document.getElementById('endScreen').style.display = 'flex';
+    }
+
+    function togglePause() { 
+        if(!gameRunning) return;
+        gamePaused = !gamePaused; 
+        document.getElementById('pauseMenu').style.display = gamePaused ? 'flex' : 'none'; 
+        if(gamePaused) bgMusic.pause(); else bgMusic.play();
+    }
+
+    function toggleSettings(show) { document.getElementById('settingsMenu').style.display = show ? 'flex' : 'none'; }
+    function openTeamSelection() { document.getElementById('menu').style.display='none'; document.getElementById('teamSelection').style.display='flex'; }
+    
+    function onResize() {
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        if(isBotMode) {
+            cam1.aspect = window.innerWidth / window.innerHeight;
+            cam1.updateProjectionMatrix();
+        } else {
+            cam1.aspect = (window.innerWidth/2) / window.innerHeight;
+            cam1.updateProjectionMatrix();
+            cam2.aspect = (window.innerWidth/2) / window.innerHeight;
+            cam2.updateProjectionMatrix();
+        }
+    }
+
+    function animate() {
+        if(!gameRunning && document.getElementById('endScreen').style.display === 'flex') {
+            return;
+        }
+        requestAnimationFrame(animate); 
+        handleInput(); 
+        updatePhysics();
+        
+        let c1p = new THREE.Vector3(0,25,-45).applyMatrix4(p1.matrixWorld); cam1.position.lerp(c1p, 0.1); cam1.lookAt(p1.position);
+        if(isBotMode) {
+            renderer.setViewport(0, 0, window.innerWidth, window.innerHeight);
+            renderer.setScissor(0, 0, window.innerWidth, window.innerHeight);
+            renderer.setScissorTest(true);
+            renderer.render(scene, cam1);
+        } else {
+            let c2p = new THREE.Vector3(0,25,-45).applyMatrix4(p2.matrixWorld); cam2.position.lerp(c2p, 0.1); cam2.lookAt(p2.position);
+            renderer.setViewport(0, 0, window.innerWidth/2, window.innerHeight);
+            renderer.setScissor(0, 0, window.innerWidth/2, window.innerHeight);
+            renderer.setScissorTest(true);
+            renderer.render(scene, cam1);
+            renderer.setViewport(window.innerWidth/2, 0, window.innerWidth/2, window.innerHeight);
+            renderer.setScissor(window.innerWidth/2, 0, window.innerWidth/2, window.innerHeight);
+            renderer.setScissorTest(true);
+            renderer.render(scene, cam2);
+        }
+    }
+    init();
+</script>
+</body>
+</html>
