@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#4285f4">
+    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/5690/5690554.png">
+    
+    <title>CULC RUSH - Master Edition v3</title>
+    <style>
+        * { touch-action: none; -webkit-tap-highlight-color: transparent; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', sans-serif; background: #121212; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; overflow: hidden; color: white; }
+        
+        .screen { position: absolute; width: 95vw; max-width: 350px; height: 90vh; max-height: 600px; background: white; border: 4px solid #4285f4; border-radius: 25px; box-shadow: 0 15px 35px rgba(0,0,0,0.5); display: none; flex-direction: column; align-items: center; justify-content: center; color: #333; z-index: 10; }
+        #main-menu { display: flex; z-index: 20; }
+        
+        /* LOGO UI GÜNCELLENDİ: SÜRE BLOĞU KALDIRILDI */
+        .game-logo { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 15px; animation: float 3s ease-in-out infinite; }
+        .logo-block { width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-weight: bold; color: white; font-size: 20px; box-shadow: inset 0 -4px rgba(0,0,0,0.2); }
+        @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-15px); } }
+
+        .title { color: #4285f4; font-size: 42px; font-weight: bold; margin-bottom: 20px; text-shadow: 2px 2px 0px #eee; }
+        .menu-btn { color: white; border: none; padding: 14px; font-size: 16px; border-radius: 35px; cursor: pointer; margin: 5px; width: 220px; font-weight: bold; transition: 0.2s; position: relative; z-index: 50; box-shadow: 0 4px 0 rgba(0,0,0,0.1); }
+        .btn-klasik { background: #34a853; }
+        .btn-kaos { background: #ea4335; }
+        .btn-blue { background: #4285f4; }
+        
+        .bottom-btn { position: absolute; bottom: 20px; font-size: 35px; cursor: pointer; background: none; border: none; z-index: 100; padding: 10px; }
+        #settings-trigger { right: 30px; }
+        #stats-trigger { left: 30px; }
+
+        #game-area { position: relative; width: 250px; height: 400px; background: #f8f9fa; border: 2px solid #ddd; border-radius: 12px; overflow: hidden; margin-top: 10px; z-index: 5; }
+        
+        .square { position: absolute; width: 50px; height: 50px; display: flex; align-items: center; justify-content: center; font-size: 22px; font-weight: bold; color: white; border-radius: 10px; box-shadow: inset 0 -4px rgba(0,0,0,0.2); pointer-events: auto; }
+        .square.bomb { background: #000 !important; font-size: 28px; border: 3px solid #ea4335; z-index: 100; cursor: pointer; }
+        .square.blocker { background: #ff0000 !important; font-size: 28px; border: 3px solid #7a0000; z-index: 50; }
+        
+        .overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255, 255, 255, 0.98); display: none; flex-direction: column; align-items: center; justify-content: center; z-index: 300; text-align: center; border-radius: 20px; padding: 20px; }
+        .setting-row { margin: 15px 0; width: 85%; display: flex; justify-content: space-between; align-items: center; color: #333; font-weight: bold; border-bottom: 1px solid #eee; padding-bottom: 5px; }
+        #pause-btn { position: absolute; top: 15px; left: 15px; z-index: 200; background: #eee; border: none; border-radius: 50%; width: 45px; height: 45px; font-size: 22px; cursor: pointer; color: #333; }
+        
+        .jammed-active { border: 6px solid #ff0000 !important; animation: blinkRed 0.5s infinite; }
+        @keyframes blinkRed { 50% { border-color: transparent; } }
+        .shake { animation: shakeEffect 0.3s cubic-bezier(.36,.07,.19,.97) both; transform: translate3d(0, 0, 0); }
+        @keyframes shakeEffect { 10%, 90% { transform: translate3d(-1px, 0, 0); } 30%, 50%, 70% { transform: translate3d(-4px, 0, 0); } 40%, 60% { transform: translate3d(4px, 0, 0); } }
+
+        .switch { position: relative; display: inline-block; width: 50px; height: 24px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .4s; border-radius: 24px; }
+        .slider:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; }
+        input:checked + .slider { background-color: #34a853; }
+        input:checked + .slider:before { transform: translateX(26px); }
+    </style>
+</head>
+<body>
+
+    <audio id="music-classic" loop><source src="https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3" type="audio/mpeg"></audio>
+    <audio id="music-chaos" loop><source src="https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3" type="audio/mpeg"></audio>
+
+    <div id="main-menu" class="screen">
+        <div class="game-logo">
+            <div class="logo-block" style="background:#4285f4">7</div>
+            <div class="logo-block" style="background:#ea4335">💣</div>
+            <div class="logo-block" style="background:#34a853">4</div>
+            <div class="logo-block" style="background:#ff0000">⛔</div>
+        </div>
+        <div class="title">CULC RUSH</div>
+        <button id="btn-klasik-txt" class="menu-btn btn-klasik" onclick="startGame('klasik')">KLASİK MOD</button>
+        <button id="btn-kaos-txt" class="menu-btn btn-kaos" onclick="startGame('kaos')">KAOS MOD</button>
+        <button id="btn-exit-txt" class="menu-btn" style="background:#5f6368" onclick="window.close()">ÇIKIŞ</button>
+        
+        <button id="stats-trigger" class="bottom-btn">🏆</button>
+        <button id="settings-trigger" class="bottom-btn">⚙️</button>
+
+        <div id="settings-panel" class="overlay">
+            <h2 id="txt-settings-title" style="color:#4285f4">AYARLAR</h2>
+            <div class="setting-row">
+                <span id="txt-lang">Dil</span>
+                <select id="lang-select" onchange="changeLanguage(this.value)">
+                    <option value="tr">Türkçe</option>
+                    <option value="en">English</option>
+                </select>
+            </div>
+            <div class="setting-row">
+                <span id="txt-vibrate">Titreşim</span>
+                <label class="switch"><input type="checkbox" id="vibrate-toggle" checked><span class="slider"></span></label>
+            </div>
+            <div class="setting-row">
+                <span id="txt-music">Müzik Sesi</span>
+                <input id="vol-slider" type="range" min="0" max="1" step="0.1" value="0.5" oninput="updateVol(this.value)">
+            </div>
+            <button id="btn-settings-close" class="menu-btn btn-klasik" onclick="toggleSettings()">KAPAT</button>
+        </div>
+
+        <div id="stats-panel" class="overlay">
+            <h2 id="txt-stats-title" style="color:#fbbc05">SKORLAR</h2>
+            <div style="font-size: 1.1em; margin: 20px 0; text-align: left; width: 80%; color:#333;">
+                <p><span id="txt-last-score">Son Skor</span>: <span id="last-played-score">0</span></p>
+                <p><span id="txt-hs-klasik">Klasik Rekor</span>: <span id="hs-klasik-val">0</span></p>
+                <p><span id="txt-hs-kaos">Kaos Rekor</span>: <span id="hs-kaos-val">0</span></p>
+            </div>
+            <button id="btn-stats-back" class="menu-btn btn-blue" onclick="toggleStats()">GERİ</button>
+        </div>
+    </div>
+
+    <div id="game-screen" class="screen">
+        <button id="pause-btn" onclick="togglePause()">☰</button>
+        <div style="margin-bottom:10px; font-weight:bold; color:#333;">
+            <span id="txt-game-score">Puan</span>: <span id="score">0</span> | <span id="txt-game-timer">Süre</span>: <span id="timer">60</span>
+        </div>
+        <div id="game-area"></div>
+        <div id="pause-menu" class="overlay">
+            <h2 id="txt-paused" style="color:#ea4335">DURAKLATILDI</h2>
+            <button id="btn-resume" class="menu-btn btn-klasik" onclick="togglePause()">DEVAM ET</button>
+            <button id="btn-restart" class="menu-btn btn-kaos" onclick="resetGame()">TEKRAR BAŞLA</button>
+            <button id="btn-home" class="menu-btn btn-blue" onclick="goHome()">ANA MENÜ</button>
+        </div>
+        <div id="game-over" class="overlay">
+            <h2 id="txt-gameover">BİTTİ!</h2>
+            <p><span id="txt-final-score">Skorun</span>: <span id="last-score-display">0</span></p>
+            <button id="btn-retry" class="menu-btn btn-blue" onclick="resetGame()">TEKRAR DENE</button>
+            <button id="btn-home-over" class="menu-btn btn-klasik" onclick="goHome()">ANA MENÜ</button>
+        </div>
+    </div>
+
+<script>
+    const langData = {
+        tr: {
+            classic: "KLASİK MOD", chaos: "KAOS MOD", exit: "ÇIKIŞ", settings: "AYARLAR", lang: "Dil", vibrate: "Titreşim", 
+            music: "Müzik Sesi", close: "KAPAT", stats: "SKORLAR", last: "Son Skor", hsClassic: "Klasik Rekor", 
+            hsChaos: "Kaos Rekor", back: "GERİ", gameScore: "Puan", gameTimer: "Süre", paused: "DURAKLATILDI", 
+            resume: "DEVAM ET", restart: "TEKRAR BAŞLA", home: "ANA MENÜ", gameover: "BİTTİ!", final: "Skorun", retry: "TEKRAR DENE"
+        },
+        en: {
+            classic: "CLASSIC MODE", chaos: "CHAOS MODE", exit: "EXIT", settings: "SETTINGS", lang: "Language", vibrate: "Vibration", 
+            music: "Music Vol", close: "CLOSE", stats: "STATS", last: "Last Score", hsClassic: "Classic Best", 
+            hsChaos: "Chaos Best", back: "BACK", gameScore: "Score", gameTimer: "Time", paused: "PAUSED", 
+            resume: "RESUME", restart: "RESTART", home: "MAIN MENU", gameover: "GAME OVER!", final: "Your Score", retry: "RETRY"
+        }
+    };
+
+    let score = 0, timeLeft = 60, gameActive = false, isPaused = false, currentMode = 'klasik', activeSquare = null, settledSquares = [], gameInt = null, timeInt = null, currentMusic = null;
+    let isJammed = false, jamTimer = null, bombVelX = 14, fallSpeed = 6;
+    let blockerSpawned = false; 
+    const gameArea = document.getElementById('game-area');
+
+    function changeLanguage(lang) {
+        const d = langData[lang];
+        document.getElementById('btn-klasik-txt').innerText = d.classic;
+        document.getElementById('btn-kaos-txt').innerText = d.chaos;
+        document.getElementById('btn-exit-txt').innerText = d.exit;
+        document.getElementById('txt-settings-title').innerText = d.settings;
+        document.getElementById('txt-lang').innerText = d.lang;
+        document.getElementById('txt-vibrate').innerText = d.vibrate;
+        document.getElementById('txt-music').innerText = d.music;
+        document.getElementById('btn-settings-close').innerText = d.close;
+        document.getElementById('txt-stats-title').innerText = d.stats;
+        document.getElementById('txt-last-score').innerText = d.last;
+        document.getElementById('txt-hs-klasik').innerText = d.hsClassic;
+        document.getElementById('txt-hs-kaos').innerText = d.hsChaos;
+        document.getElementById('btn-stats-back').innerText = d.back;
+        document.getElementById('txt-game-score').innerText = d.gameScore;
+        document.getElementById('txt-game-timer').innerText = d.gameTimer;
+        document.getElementById('txt-paused').innerText = d.paused;
+        document.getElementById('btn-resume').innerText = d.resume;
+        document.getElementById('btn-restart').innerText = d.restart;
+        document.getElementById('btn-home').innerText = d.home;
+        document.getElementById('txt-gameover').innerText = d.gameover;
+        document.getElementById('txt-final-score').innerText = d.final;
+        document.getElementById('btn-retry').innerText = d.retry;
+        document.getElementById('btn-home-over').innerText = d.home;
+    }
+
+    function vibrate(ms) { if (document.getElementById('vibrate-toggle').checked && navigator.vibrate) navigator.vibrate(ms); }
+    
+    document.getElementById('settings-trigger').onclick = toggleSettings;
+    document.getElementById('stats-trigger').onclick = toggleStats;
+    function toggleSettings() { const p = document.getElementById('settings-panel'); p.style.display = (p.style.display === 'flex') ? 'none' : 'flex'; }
+    function toggleStats() {
+        const p = document.getElementById('stats-panel');
+        if(p.style.display !== 'flex') {
+            document.getElementById('last-played-score').innerText = localStorage.getItem('culcRushLast') || 0;
+            document.getElementById('hs-klasik-val').innerText = localStorage.getItem('culcRushHS_klasik') || 0;
+            document.getElementById('hs-kaos-val').innerText = localStorage.getItem('culcRushHS_kaos') || 0;
+            p.style.display = 'flex';
+        } else p.style.display = 'none';
+    }
+
+    function updateVol(v) { if(currentMusic) currentMusic.volume = v; }
+
+    function startGame(mode) {
+        currentMode = mode;
+        if(currentMusic) currentMusic.pause();
+        currentMusic = document.getElementById(mode === 'klasik' ? 'music-classic' : 'music-chaos');
+        document.getElementById('main-menu').style.display = 'none';
+        document.getElementById('game-screen').style.display = 'flex';
+        resetGame();
+    }
+
+    function resetGame() {
+        clearInterval(gameInt); clearInterval(timeInt);
+        gameArea.innerHTML = ""; settledSquares = []; activeSquare = null; 
+        score = 0; timeLeft = 60; gameActive = true; isPaused = false;
+        isJammed = false; blockerSpawned = false;
+        gameArea.classList.remove('jammed-active');
+        document.getElementById('score').innerText = "0"; document.getElementById('timer').innerText = "60";
+        document.getElementById('game-over').style.display = 'none'; document.getElementById('pause-menu').style.display = 'none';
+        currentMusic.currentTime = 0; currentMusic.play().catch(()=>{});
+        gameInt = setInterval(gameLoop, 30);
+        timeInt = setInterval(() => { if(!isPaused && gameActive) { timeLeft--; document.getElementById('timer').innerText = timeLeft; if(timeLeft<=0) endGame(); }}, 1000);
+        createSquare();
+    }
+
+    function createSquare() {
+        if(!gameActive || isPaused || activeSquare) return;
+        let type = 'normal';
+        if(currentMode === 'kaos') {
+            let rnd = Math.random();
+            // SÜRE BLOĞU (TIME) TAMAMEN KALDIRILDI
+            if(rnd < 0.15) type = 'bomb'; 
+            else if(rnd < 0.20 || (timeLeft < 15 && !blockerSpawned)) { type = 'blocker'; blockerSpawned = true; }
+        }
+        const sq = document.createElement('div'); sq.className = 'square ' + type;
+        sq.style.left = (Math.floor(Math.random() * 5) * 50) + 'px'; sq.style.top = '0px'; sq.dataset.type = type;
+        
+        if(type === 'normal') {
+            const v = Math.floor(Math.random()*9)+1; sq.innerText = v; sq.dataset.value = v;
+            sq.style.backgroundColor = `hsl(${Math.random()*360}, 70%, 50%)`;
+        } else if(type === 'bomb') {
+            sq.innerText = '💣'; sq.dataset.hp = 3; 
+            sq.onpointerdown = (e) => { 
+                e.preventDefault(); e.stopPropagation();
+                if(!isPaused && gameActive) {
+                    sq.dataset.hp = parseInt(sq.dataset.hp) - 1;
+                    vibrate(60);
+                    if(parseInt(sq.dataset.hp) <= 0) explodeBomb(sq);
+                }
+            };
+        } else if(type === 'blocker') { sq.innerText = '⛔'; }
+        
+        gameArea.appendChild(sq); activeSquare = sq;
+    }
+
+    function gameLoop() {
+        if(!activeSquare || isPaused || !gameActive) return;
+
+        if(activeSquare.dataset.type === 'bomb') {
+            let curX = parseInt(activeSquare.style.left);
+            if(curX <= 0 || curX >= 200) bombVelX *= -1;
+            activeSquare.style.left = (curX + bombVelX) + "px";
+        }
+
+        let top = parseInt(activeSquare.style.top) + (activeSquare.dataset.type === 'bomb' ? 4 : fallSpeed);
+        let left = Math.round(parseInt(activeSquare.style.left) / 50) * 50;
+        
+        let hit = null;
+        for (let s of settledSquares) {
+            let sLeft = parseInt(s.style.left);
+            let sTop = parseInt(s.style.top);
+            if (Math.abs(sLeft - left) < 5 && top + 50 >= sTop && top < sTop) {
+                hit = s;
+                break;
+            }
+        }
+
+        if (top >= 350 || hit) {
+            let finalTop = hit ? (parseInt(hit.style.top) - 50) : 350;
+            
+            if(activeSquare.dataset.type === 'bomb') { 
+                score -= 10; vibrate(150); explodeBomb(activeSquare); 
+            }
+            else if(activeSquare.dataset.type === 'blocker') { 
+                activateJam(); settleCurrent(left, finalTop); 
+            }
+            else if(hit && activeSquare.dataset.type === hit.dataset.type) { 
+                processMatch(activeSquare, hit); 
+            }
+            else {
+                settleCurrent(left, finalTop);
+            }
+            document.getElementById('score').innerText = score;
+        } else {
+            activeSquare.style.top = top + 'px';
+        }
+    }
+
+    function settleCurrent(l, t) {
+        if(!activeSquare) return;
+        activeSquare.style.left = l + "px"; 
+        activeSquare.style.top = t + "px"; 
+        settledSquares.push(activeSquare);
+        if(t <= 0) endGame();
+        activeSquare = null; 
+        createSquare();
+    }
+
+    function processMatch(active, target) {
+        // SÜRE BLOĞU MANTIĞI KALDIRILDI
+        const v1 = parseInt(active.dataset.value), v2 = parseInt(target.dataset.value); 
+        if((v1%2===0)===(v2%2===0)) score+=(v1+v2); else { score-=5; vibrate(40); }
+        
+        active.remove(); target.remove(); 
+        settledSquares = settledSquares.filter(s => s !== target); 
+        activeSquare = null; 
+        createSquare();
+    }
+
+    function activateJam() { isJammed = true; gameArea.classList.add('jammed-active'); clearTimeout(jamTimer); vibrate(100); jamTimer = setTimeout(() => { isJammed = false; gameArea.classList.remove('jammed-active'); }, 5000); }
+    
+    function explodeBomb(sq) { 
+        gameArea.classList.add('shake'); 
+        vibrate(300); 
+        if(isJammed) { isJammed = false; gameArea.classList.remove('jammed-active'); clearTimeout(jamTimer); } 
+        settledSquares.forEach(s => s.remove()); 
+        settledSquares = []; 
+        sq.remove(); 
+        if(activeSquare === sq) activeSquare = null; 
+        setTimeout(() => { gameArea.classList.remove('shake'); if(!activeSquare) createSquare(); }, 300); 
+    }
+
+    gameArea.onpointermove = (e) => {
+        if(!activeSquare || isPaused || isJammed || activeSquare.dataset.type === 'bomb') return;
+        const rect = gameArea.getBoundingClientRect();
+        let col = Math.floor((e.clientX - rect.left) / 50);
+        activeSquare.style.left = Math.max(0, Math.min(4, col)) * 50 + "px";
+    };
+
+    function togglePause() { isPaused = !isPaused; document.getElementById('pause-menu').style.display = isPaused ? 'flex' : 'none'; if(isPaused) currentMusic.pause(); else currentMusic.play(); }
+    function goHome() { gameActive = false; currentMusic.pause(); document.getElementById('game-screen').style.display = 'none'; document.getElementById('main-menu').style.display = 'flex'; }
+    function endGame() { gameActive = false; currentMusic.pause(); localStorage.setItem('culcRushLast', score); localStorage.setItem('culcRushHS_' + currentMode, Math.max(score, localStorage.getItem('culcRushHS_' + currentMode) || 0)); document.getElementById('last-score-display').innerText = score; document.getElementById('game-over').style.display = 'flex'; }
+
+    // PWA Manifest
+    const manifest = { "name": "CULC RUSH", "short_name": "CULC Rush", "start_url": ".", "display": "standalone", "background_color": "#121212", "icons": [{"src": "https://cdn-icons-png.flaticon.com/512/5690/5690554.png", "sizes": "512x512", "type": "image/png"}] };
+    const blob = new Blob([JSON.stringify(manifest)], {type: 'application/json'});
+    const link = document.createElement('link'); link.rel = 'manifest'; link.href = URL.createObjectURL(blob); document.head.appendChild(link);
+</script>
+</body>
+</html>
